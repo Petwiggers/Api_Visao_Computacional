@@ -48,7 +48,6 @@ def get_current_user(
     return UsuarioAuth(
         id=usuario.id,
         nome=usuario.nome,
-        matricula=usuario.matricula,
         cpf=usuario.cpf,
         grupo=usuario.grupo,
     )

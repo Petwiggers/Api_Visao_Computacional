@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class LoginRequest(BaseModel):
-    cpf: str
+    email: str
     senha: str
     
 class TokenResponse(BaseModel):

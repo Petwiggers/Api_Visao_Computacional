@@ -35,20 +35,20 @@ router = APIRouter()
 async def login(request: Request, login_data: LoginRequest, db: AsyncSession = Depends(get_async_db)):
     """Realiza login do usuário e retorna access token e refresh token."""
     try:
-        result = await db.execute(select(UsuarioDB).where(UsuarioDB.cpf == login_data.cpf))
+        result = await db.execute(select(UsuarioDB).where(UsuarioDB.email == login_data.email))
         usuario = result.scalar_one_or_none()
 
         if not usuario:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="CPF ou senha inválidos",
+                detail="Email ou senha inválidos",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
         if not verify_password(login_data.senha, usuario.senha):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="CPF ou senha inválidos",
+                detail="Email ou senha inválidos",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -106,8 +106,8 @@ async def refresh_token(request: Request, refresh_data: RefreshTokenRequest, db:
     """Renova o access token usando um refresh token válido."""
     try:
         payload = verify_refresh_token(refresh_data.refresh_token)
-        cpf = payload.get("sub")
-        result = await db.execute(select(UsuarioDB).where(UsuarioDB.cpf == cpf))
+        email = payload.get("sub")
+        result = await db.execute(select(UsuarioDB).where(UsuarioDB.email == email))
         usuario = result.scalar_one_or_none()
 
         if not usuario:
