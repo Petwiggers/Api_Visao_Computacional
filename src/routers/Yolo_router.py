@@ -112,7 +112,7 @@ router = APIRouter(prefix="/yolo", tags=["YOLO Detection"])
 )
 async def detect_image(
     file: UploadFile = File(..., description="Imagem (JPEG, PNG, WEBP ou BMP)"),
-    model: str = Form(default="yolov8n.pt", description="Nome ou caminho do modelo YOLO"),
+    model: str = Form(default="detectorApple.pt", description="Nome ou caminho do modelo YOLO"),
     confidence: float = Form(default=0.25, ge=0.01, le=1.0, description="Limiar mínimo de confiança"),
     iou: float = Form(default=0.45, ge=0.01, le=1.0, description="Limiar de IoU para NMS"),
 ):
@@ -168,16 +168,13 @@ async def detect_image(
 # POST /yolo/detect/image/annotated  — retorna a imagem com boxes desenhadas
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/detect/image/annotated",
-    summary="Detecta objetos e retorna a imagem anotada (JPEG)",
-    response_class=StreamingResponse,
-)
+@router.post("/detect/image/annotated", response_class=StreamingResponse)
 async def detect_image_annotated(
-    file: UploadFile = File(..., description="Imagem (JPEG, PNG, WEBP ou BMP)"),
-    model: str = Form(default="yolov8n.pt"),
+    file: UploadFile = File(...),
+    model: str = Form(default="detectorApple.pt"),
     confidence: float = Form(default=0.25, ge=0.01, le=1.0),
     iou: float = Form(default=0.45, ge=0.01, le=1.0),
+    imgsz: int = Form(default=640, ge=320, le=2048, description="Tamanho de entrada para o modelo (ex: 640)"),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=415, detail=f"Tipo não suportado: {file.content_type}")
@@ -186,23 +183,21 @@ async def detect_image_annotated(
     try:
         pil_image = Image.open(io.BytesIO(content)).convert("RGB")
         image_array = np.array(pil_image)
+        image_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)  # ✅ RGB → BGR
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Imagem inválida: {str(exc)}")
 
     yolo = get_model(model)
-    results = yolo(image_array, conf=confidence, iou=iou, verbose=False)
+    results = yolo(image_bgr, conf=confidence, iou=iou, imgsz=640, verbose=False)
 
-    # Converte para BGR (OpenCV) → desenha → converte de volta para RGB
-    bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-    annotated = draw_boxes_on_image(bgr, results)
-    rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+    annotated_bgr = results[0].plot(line_width=3, labels=False, conf=True)  # ✅ já é BGR
 
-    # Encode como JPEG
-    _, buffer = cv2.imencode(".jpg", cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    _, buffer = cv2.imencode(".jpg", annotated_bgr)  # ✅ direto, sem conversão extra
+
     return StreamingResponse(
         io.BytesIO(buffer.tobytes()),
         media_type="image/jpeg",
-        headers={"X-Total-Detections": str(len(serialize_results(results)))},
+        headers={"X-Total-Detections": str(len(results[0].boxes))},
     )
 
 
@@ -216,7 +211,7 @@ async def detect_image_annotated(
 )
 async def detect_video(
     file: UploadFile = File(..., description="Vídeo (MP4, AVI, MOV ou MKV)"),
-    model: str = Form(default="yolov8n.pt"),
+    model: str = Form(default="detectorApple.pt"),
     confidence: float = Form(default=0.25, ge=0.01, le=1.0),
     iou: float = Form(default=0.45, ge=0.01, le=1.0),
     frame_skip: int = Form(default=1, ge=1, le=60, description="Processar 1 a cada N frames"),
@@ -314,6 +309,7 @@ AVAILABLE_MODELS = {
     "yolov8x.pt": "YOLOv8 XLarge — mais lento, mais preciso",
     "yolov8n-seg.pt": "YOLOv8 Nano Segmentação",
     "yolov8n-pose.pt": "YOLOv8 Nano Pose Estimation",
+    "detectorApple.pt": "Modelo personalizado para detecção de maçãs",
 }
 
 

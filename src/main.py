@@ -62,7 +62,7 @@ async def root():
 app.include_router(AuthRouter.router)
 app.include_router(AuditoriaRouter.router)
 app.include_router(HealthRouter.router)
-app.include_router(yolo_router)
+app.include_router(Yolo_router.router)
     
 if __name__ == "__main__":
     uvicorn.run('main:app', host=HOST, port=int(PORT), reload=RELOAD)
