@@ -23,6 +23,8 @@ from ultralytics import YOLO
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from datetime import datetime
+
 # ---------------------------------------------------------------------------
 # Configurações
 # ---------------------------------------------------------------------------
@@ -73,26 +75,6 @@ def serialize_results(results) -> list[dict]:
             }
             detections.append(detection)
     return detections
-
-
-def draw_boxes_on_image(image_array: np.ndarray, results) -> np.ndarray:
-    """Desenha bounding boxes na imagem para retorno visual."""
-    for result in results:
-        for box in result.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            confidence = float(box.conf[0])
-            class_name = result.names[int(box.cls[0])]
-
-            cv2.rectangle(image_array, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            label = f"{class_name} {confidence:.2f}"
-            (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
-            cv2.rectangle(image_array, (x1, y1 - text_h - 6), (x1 + text_w, y1), (0, 255, 0), -1)
-            cv2.putText(
-                image_array, label, (x1, y1 - 4),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1, cv2.LINE_AA,
-            )
-    return image_array
-
 
 # ---------------------------------------------------------------------------
 # Router
@@ -181,9 +163,8 @@ async def detect_image_annotated(
 
     content = await file.read()
     try:
-        pil_image = Image.open(io.BytesIO(content)).convert("RGB")
-        image_array = np.array(pil_image)
-        image_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)  # ✅ RGB → BGR
+        np_array = np.frombuffer(content, np.uint8)
+        image_bgr = cv2.imdecode(np_array, cv2.IMREAD_COLOR) # ✅ RGB → BGR
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Imagem inválida: {str(exc)}")
 
@@ -193,11 +174,12 @@ async def detect_image_annotated(
     annotated_bgr = results[0].plot(line_width=3, labels=False, conf=True)  # ✅ já é BGR
 
     _, buffer = cv2.imencode(".jpg", annotated_bgr)  # ✅ direto, sem conversão extra
-
+    data_retorno = datetime.now();
     return StreamingResponse(
         io.BytesIO(buffer.tobytes()),
         media_type="image/jpeg",
-        headers={"X-Total-Detections": str(len(results[0].boxes))},
+        headers={"X-Total-Detections": str(len(results[0].boxes)),
+                "Data-Return": data_retorno.strftime("%d/%m/%Y %H:%M")},
     )
 
 
