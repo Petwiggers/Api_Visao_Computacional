@@ -11,6 +11,7 @@ import uvicorn
 from routers import AuthRouter
 from routers import AuditoriaRouter
 from routers import HealthRouter
+from routers import Yolo_router
 
 #app = FastAPI() # Importar middleware personalizado
 from infra.middleware.IPAccessMiddleware import IPAccessMiddleware
@@ -61,6 +62,7 @@ async def root():
 app.include_router(AuthRouter.router)
 app.include_router(AuditoriaRouter.router)
 app.include_router(HealthRouter.router)
+app.include_router(Yolo_router.router)
     
 if __name__ == "__main__":
     uvicorn.run('main:app', host=HOST, port=int(PORT), reload=RELOAD)
